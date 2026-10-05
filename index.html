@@ -3755,24 +3755,24 @@ document.documentElement.dataset.view='home';
     const calm=1-sseg(u,0,.06);
     S(lap,'transform',`rotateX(${((4+mX)*calm).toFixed(2)}deg) rotateY(${(mY*calm).toFixed(2)}deg)`);
     lap.classList.toggle('scrolling',p>0.0005);
-    const oL=1-sseg(u,.172,.198);
+    const oL=1-sseg(u,.185,.225);
     S(podium,'--dim',(sseg(u,.045,.11)*(1-.6*sseg(u,.085,.105)*(1-sseg(u,.165,.18)))).toFixed(2));   // podium dims with the room, lifts under the spotlights
     S(stage,'opacity',oL.toFixed(3)); S(stage,'visibility',oL>.002?'visible':'hidden');
     window.__lapVis?.(oL>.002);
     if(lapSpots){ const on=sseg(u,.085,.105)*(1-sseg(u,.165,.18)); S(lapSpots,'opacity',on.toFixed(3)); S(lapSpots,'visibility',on>.002?'visible':'hidden'); }
 
     // iPads fade up quickly out of the blackout
-    const fadeT=sseg(u,.188,.222);
+    const fadeT=sseg(u,.222,.262);
     const oT=ringO(aT)*fadeT;
     S(sceneTabs,'visibility',oT>.002?'visible':'hidden');
     S(tabsRow,'transform',ringXf(aT,vw)); S(tabsRow,'opacity',oT.toFixed(3));
-    const hT=sseg(u,.235,.285)*(1-sseg(u,.49,.53));
-    S(headTabs,'opacity',hT.toFixed(3)); S(headTabs,'transform',`translateY(${((1-hT)*26).toFixed(1)}px)`);
+    // headline and spotlights switch on/off with a short timed fade (not redrawn on every scroll frame)
+    headTabs.classList.toggle('show', u>.27 && u<.51);
 
     // grey studio -> black around the iPads, spotlights once they settle
-    const dk=.8*sseg(u,.045,.11)+.2*sseg(u,.165,.2), sp=sseg(u,.23,.28)*(1-sseg(u,.49,.54));
+    const dk=.8*sseg(u,.045,.11)+.2*sseg(u,.165,.2), sp=(u>.27 && u<.515)?1:0;
     S(bgDark,'opacity',dk.toFixed(3));
-    S(headTabs,'--dk',dk.toFixed(2)); spotEls.forEach(e=>S(e,'opacity',sp.toFixed(3))); proHead.forEach(h=>S(h,'--dk',dk.toFixed(2)));   // set on the lights themselves, not the whole iPad scene (that restyled every app inside the iPads each frame)
+    S(headTabs,'--dk',dk.toFixed(2)); spotEls.forEach(e=>e.classList.toggle('on',sp>0)); proHead.forEach(h=>S(h,'--dk',dk.toFixed(2)));   // set on the lights themselves, not the whole iPad scene (that restyled every app inside the iPads each frame)
 
     // iPad Pro
     const oP=ringO(aP);
@@ -5787,6 +5787,12 @@ document.querySelectorAll('.studio .laurel').forEach(svg=>{
   /* phones: the contact column was as wide as the email address, which let the whole page slide sideways */
   @media (max-width:860px){ .ct-grid{ grid-template-columns:minmax(0,1fr) !important; } .ct-list > div{ grid-template-columns:96px minmax(0,1fr) !important; } }
   #cEmail{ overflow-wrap:anywhere; min-width:0; }
+  /* iPad scene: headline and spotlights fade on a timer when you arrive, instead of being redrawn every scroll frame */
+  #headTabs{ opacity:0; transform:translateY(26px); transition:opacity .55s ease, transform .7s cubic-bezier(.2,.8,.2,1); }
+  #headTabs.show{ opacity:1; transform:none; }
+  .dev .spot, .dev .pool{ opacity:0 !important; transition:opacity .45s ease; }
+  .dev .spot.on, .dev .pool.on{ opacity:1 !important; }
+  .dev .spot::before{ filter:none !important; }
   /* desktop & iPad landscape: a smaller title, a little higher, so the laptop has room to breathe */
   @media (min-width:721px) and (orientation:landscape){
     .studio .hero-kicker{ top:calc(clamp(56px,10vh,120px) - 26px) !important; }
