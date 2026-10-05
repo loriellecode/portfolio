@@ -23,10 +23,11 @@ html.door-lock, html.door-lock body{ overflow:hidden !important; overscroll-beha
   box-shadow:inset 0 -14px 0 #8d97a8, inset 0 -18px 0 #20242e; }
 #door .gd-handle{ position:absolute; left:50%; bottom:34px; width:120px; height:18px; translate:-50% 0;
   background:linear-gradient(#f2f4f8,#9aa3b2); border:3px solid #14161c; border-radius:10px; box-shadow:3px 4px 0 #3b5bff; }
-#door .gd-sign{ position:absolute; left:50%; top:46%; translate:-50% -50%; text-align:center; opacity:0; transition:opacity .45s;
+#door .gd-sign{ position:absolute; left:50%; top:46%; translate:-50% -50%; text-align:center; opacity:0;
   background:#1a2a6c; border:4px solid #0b0d12; border-radius:14px; padding:clamp(16px,2.6vw,30px) clamp(22px,4vw,54px) clamp(14px,2.2vw,26px);
   box-shadow:8px 9px 0 #3b5bff, 0 30px 60px rgba(0,0,0,.35); transform:rotate(-2deg); }
-#door.fonts .gd-sign{ opacity:1; }
+#door.fonts .gd-sign{ opacity:1; animation:gdStamp .5s cubic-bezier(.2,1.3,.4,1) both; }
+@keyframes gdStamp{ 0%{ opacity:0; scale:1.3 } 55%{ opacity:1; scale:.97 } 100%{ opacity:1; scale:1 } }
 #door .gd-sign::before, #door .gd-sign::after{ content:""; position:absolute; top:12px; width:11px; height:11px; border-radius:50%;
   background:radial-gradient(circle at 35% 35%,#fff,#8c95a6 60%,#3b4252); border:2px solid #0b0d12; }
 #door .gd-sign::before{ left:12px } #door .gd-sign::after{ right:12px }
@@ -54,14 +55,25 @@ html.door-lock, html.door-lock body{ overflow:hidden !important; overscroll-beha
   <i class="gd-beam"></i><i class="gd-rail l"></i><i class="gd-rail r"></i>
 </div>
 <script>
+// iPhone/iPad fire 'resize' every time Safari's toolbar shows or hides during a scroll. Only pass real size
+// changes (rotation, window resize) on to the page, so the scene never re-measures itself mid-scroll.
+(()=>{ let w=innerWidth, h=innerHeight; const touch=matchMedia('(pointer: coarse)').matches;
+  addEventListener('resize',e=>{ const nw=innerWidth, nh=innerHeight;
+    if(touch && nw===w && Math.abs(nh-h)<180){ e.stopImmediatePropagation(); return; } w=nw; h=nh; }); })();
+document.documentElement.dataset.view='home';
 (()=>{
   const de=document.documentElement, door=document.getElementById('door');
   try{ history.scrollRestoration='manual'; }catch(e){}
   de.classList.add('door-lock'); scrollTo(0,0);
   const t0=performance.now(); let opened=false, resolve;
   window.__doorP=new Promise(r=>resolve=r);
-  const showSign=()=>door.classList.add('fonts');
-  (document.fonts?.ready||Promise.resolve()).then(showSign); setTimeout(showSign,900);
+  // the sign appears once its comic fonts have arrived (no fallback-font flash), then stays up at least a second
+  let signAt=0, signDone; const signShown=new Promise(r=>signDone=r);
+  const showSign=()=>{ if(signAt) return; signAt=performance.now(); door.classList.add('fonts'); signDone(); };
+  new Promise(r=>{ const chk=()=>{ const l=document.querySelector('link[href*="fonts.googleapis.com/css"]'); if(!l) return setTimeout(chk,30);
+      if(l.sheet) r(); else { l.addEventListener('load',r,{once:true}); l.addEventListener('error',r,{once:true}); } }; chk(); })
+    .then(()=>Promise.all(['900 40px Archivo','800 12px Outfit'].map(f=>document.fonts?.load(f)))).then(showSign,showSign);
+  setTimeout(showSign,1500);
   const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   function open(){
     if(opened) return; opened=true; scrollTo(0,0);
@@ -80,7 +92,10 @@ html.door-lock, html.door-lock body{ overflow:hidden !important; overscroll-beha
     setTimeout(()=>de.classList.remove('door-lock'),1500);
     a.finished.then(done,done);
   }
-  const ready=()=>{ const wait=Math.max(0,1500-(performance.now()-t0)); setTimeout(()=>{ door.classList.add('ready'); setTimeout(open,700); },wait); };
+  const decodeAll=()=>Promise.race([new Promise(r=>setTimeout(r,2500)),
+    Promise.all([...document.querySelectorAll('#view-home img')].map(i=>i.decode?i.decode().catch(()=>{}):0))]);
+  const ready=()=>Promise.all([signShown,decodeAll()]).then(()=>{ const now=performance.now(), wait=Math.max(0,1500-(now-t0),1000-(now-signAt));
+    setTimeout(()=>{ door.classList.add('ready'); setTimeout(open,700); },wait); });
   if(document.readyState==='complete') ready(); else addEventListener('load',ready,{once:true});
   setTimeout(open,7000);                         // never trap anyone behind the door
   door.addEventListener('click',open);
@@ -106,8 +121,13 @@ html.door-lock, html.door-lock body{ overflow:hidden !important; overscroll-beha
 
   /* ============ SCROLL STORY ============ */
   .story{ position:relative; height:600vh; }
+  html{ overscroll-behavior-y:none; -webkit-text-size-adjust:100%; }
+  /* the laptop's built-in demo app sits under the recordings: keep its looping effects still (one animated height forced a layout every frame) */
+  #laptop .lu-eq i, #laptop .lu-waves i, #laptop .lu-cap{ animation:none !important; }
+  body:has(#view-process:not([hidden])){ background:#02081a; }
+  body:has(#view-home:not([hidden])) .story{ background:#0b0b0d; }
   .sticky{
-    position:sticky; top:0; height:100vh; height:100svh; overflow:hidden;
+    position:sticky; top:0; height:100vh; height:100svh; height:100dvh; overflow:hidden;
     --lw:min(58vw,82vh);
   }
   .intro{
@@ -2599,7 +2619,7 @@ html.door-lock, html.door-lock body{ overflow:hidden !important; overscroll-beha
       <svg class="laurel l" viewBox="0 0 120 160" aria-hidden="true"></svg>
       <svg class="laurel r" viewBox="0 0 120 160" aria-hidden="true"></svg>
       <p class="hero-kicker" data-label="Tagline">Websites · Web Apps · Apps</p>
-      <h1 class="bigword title-logo" data-label="Movie-title logo" aria-label="The Adventures of Web Design: Lorielle Hill, web designer and developer"><img src="media/web-design-title.png" alt="" decoding="async" fetchpriority="high"></h1>
+      <h1 class="bigword title-logo" data-label="Movie-title logo" aria-label="The Adventures of Web Design: Lorielle Hill, web designer and developer"><img src="media/web-design-title-sh.png" alt="" decoding="async" fetchpriority="high"></h1>
       <p class="side l" data-label="Tag (left)">Design + Code™</p>
       <p class="side r" data-label="Name (right)">Lorielle Hill ©</p>
     </div>
@@ -3536,6 +3556,8 @@ html.door-lock, html.door-lock body{ overflow:hidden !important; overscroll-beha
                s:{x:r.left-K.left+r.width*(f[0]+f[2])/2, y:r.top-K.top+r.height*(f[1]+f[3])/2, w:r.width*(f[2]-f[0]), h:r.height*(f[3]-f[1])} };
       if(el.classList.contains('land')){ const g=geo[k], dx=g.s.x-g.o.x, dy=g.s.y-g.o.y; g.s={x:g.o.x+dy, y:g.o.y-dx, w:g.s.h, h:g.s.w}; }
     });
+    { const tr=document.querySelector('#sceneTabs .tabs-row'); const pv=proImg.style.transform; proImg.style.transform='none';
+      geo.tb=tr.getBoundingClientRect().bottom-K.top; geo.pb=proImg.getBoundingClientRect().bottom-K.top; proImg.style.transform=pv; geo.vh=sticky.clientHeight; geo.vw=sticky.clientWidth; }
   }
   // camera move for an element whose screen should fill the viewport when e=0 and sit at rest when e=1
   function camera(g,e,vw,vh,extra=''){
@@ -3559,7 +3581,7 @@ html.door-lock, html.door-lock body{ overflow:hidden !important; overscroll-beha
 
   // mouse tilt, damped
   let mTx=0, mTy=0, mX=0, mY=0;
-  if(!reduce){
+  if(!reduce && matchMedia('(hover: hover) and (pointer: fine)').matches){
     sticky.addEventListener('pointermove',e=>{
       if(document.body.classList.contains('annotating')) return;
       const r=sticky.getBoundingClientRect();
@@ -3570,19 +3592,25 @@ html.door-lock, html.door-lock body{ overflow:hidden !important; overscroll-beha
 
   // scroll progress, eased toward the real scroll position so wheel steps glide
   let target=0, prog=0, last=performance.now(), running=false;
+  // story geometry is measured once (and again on resize/load), never per frame, so scrolling never forces a layout
+  let sTop=0, sTotal=0;
+  const measureStory=()=>{ if(!story.offsetHeight) return; sTop=story.getBoundingClientRect().top+scrollY; sTotal=Math.max(1,story.offsetHeight-sticky.offsetHeight); };
   const readTarget=()=>{
-    const r=story.getBoundingClientRect(), total=story.offsetHeight-sticky.offsetHeight;
-    target=clamp(-r.top/Math.max(1,total))*.6;   // phones section is hidden for now: the story ends on the iPad Pro
+    if(!sTotal) measureStory();
+    target=clamp((scrollY-sTop)/Math.max(1,sTotal))*.6;   // phones section is hidden for now: the story ends on the iPad Pro
   };
+  const coarse=matchMedia('(pointer: coarse)').matches;   // touch screens: the scene follows the finger exactly, no trailing
   function kick(){ if(!running){ running=true; last=performance.now(); requestAnimationFrame(loop); } }
   function loop(now){
     const dt=Math.min(64,now-last)/1000; last=now;
+    if(views_home_hidden()){ running=false; return; }
     readTarget();
-    prog=reduce?target:lerp(prog,target,1-Math.exp(-dt*8));
-    if(Math.abs(prog-target)<.00004) prog=target;
+    prog=(reduce||coarse)?target:lerp(prog,target,1-Math.exp(-dt*24));   // light smoothing on mouse wheels only; follows the trackpad/finger closely
+    if(Math.abs(prog-target)<.0002) prog=target;
     mX=lerp(mX,mTx,1-Math.exp(-dt*6)); mY=lerp(mY,mTy,1-Math.exp(-dt*6));
+    if(Math.abs(mX-mTx)<.01) mX=mTx; if(Math.abs(mY-mTy)<.01) mY=mTy;
     render(prog);
-    if(prog===target && Math.abs(mX-mTx)<.01 && Math.abs(mY-mTy)<.01 && (prog>.1||reduce||document.hidden||views_home_hidden())){ running=false; return; }
+    if(prog===target && mX===mTx && mY===mTy){ running=false; return; }
     requestAnimationFrame(loop);
   }
 
@@ -3699,85 +3727,83 @@ html.door-lock, html.door-lock body{ overflow:hidden !important; overscroll-beha
     return `translate3d(${x.toFixed(1)}px,0,0)`;
   }
   const ringO=a=>1-sseg(Math.abs(a),RING.S*.7,RING.S*1.0);
+  const WR=new WeakMap();
+  function S(el,k,v){ if(!el) return; let m=WR.get(el); if(!m){ m={}; WR.set(el,m); } if(m[k]===v) return; m[k]=v; if(k.charCodeAt(0)===45) el.style.setProperty(k,v); else el.style[k]=v; }
+  const podium=stage.querySelector('.podium'), lapSpots=document.getElementById('lapSpots'), bgDark=document.getElementById('bgDark'), desk=document.getElementById('desk');
+  const goops=[...document.querySelectorAll('#view-home .goop')], powClips=[...document.querySelectorAll('#view-home .pow-clip')];
+  const proHead=[...scenePro.querySelectorAll('.scene-head')], tabScr=document.querySelector('#tabBlue .scr'), spotEls=[...sceneTabs.querySelectorAll('.spot,.pool')];
+  // one-time resets for the retired dive story
+  take.style.visibility='hidden'; devices.style.visibility='hidden'; car.style.transform=''; rhead.style.opacity=0; ctrl.style.opacity=0; ctrl.style.pointerEvents='none';
+  tabBlue.style.transform=''; tabMint.style.transform=''; tabBlue.style.opacity=1; tabMint.style.opacity=1; if(tabScr) tabScr.style.opacity=1; stage.style.transform='';
+  heroChips.forEach(el=>{ el.style.opacity=0; });
   function render(p){
-    const u=clamp(p/.6), vw=sticky.clientWidth;
-    splatEls.forEach(el=>{ const d=+el.dataset.d; el.style.transform=`translate(${(p*d*9).toFixed(2)}vw,${(-p*d*14).toFixed(2)}vh) scale(${(1+p*.25*Math.abs(d)).toFixed(3)})`; });
+    if(!geo) measureDevices();
+    const u=clamp(p/.6), vw=geo.vw||sticky.clientWidth, vh=geo.vh||sticky.clientHeight;
+    splatEls.forEach(el=>{ const d=+el.dataset.d; S(el,'transform',`translate(${(p*d*9).toFixed(2)}vw,${(-p*d*14).toFixed(2)}vh) scale(${(1+p*.25*Math.abs(d)).toFixed(3)})`); });
 
     // hero text drifts off
     const tx=sseg(u,0,.07);
-    intro.style.opacity=(1-tx).toFixed(3); intro.style.transform=`translateY(${(-tx*36).toFixed(2)}px)`;
-    const tnow=performance.now()/1000;
-    heroChips.forEach((el,i)=>{ const d=+el.dataset.d; const bob=Math.sin(tnow*1.1+i*1.7)*6;
-      el.style.opacity=(1-sseg(u,0,.1)).toFixed(3);
-      el.style.translate=`${(mY*d*1.4 + tx*d*-120).toFixed(1)}px ${(bob + mX*d*-1.2 - tx*60).toFixed(1)}px`; });
-    hint.style.opacity=(1-sseg(u,0,.04)).toFixed(3); hint.style.pointerEvents=u<.03?'auto':'none';
+    S(intro,'opacity',(1-tx).toFixed(3)); S(intro,'transform',`translateY(${(-tx*36).toFixed(1)}px)`);
+    S(hint,'opacity',(1-sseg(u,0,.04)).toFixed(3)); S(hint,'pointerEvents',u<.03?'auto':'none');
 
     // ring angle: one smooth turn to the iPads, a hold, another smooth turn to the iPad Pro
-    const glide=(x,a,b)=>.5-.5*Math.cos(Math.PI*seg(x,a,b));   // starts moving right away, settles softly
-    // laptop → iPads is a lighting change (dim, spotlights, blackout, fade up), not a slide; iPads → iPad Pro still slides along the table
+    const glide=(x,a,b)=>.5-.5*Math.cos(Math.PI*seg(x,a,b));
     const phi=RING.S*(1+glide(u,.52,.74));
-    const aL=-phi, aT=RING.S-phi, aP=2*RING.S-phi;
+    const aT=RING.S-phi, aP=2*RING.S-phi;
 
     // laptop (keeps its gentle mouse lean only while it's front and centre)
     const calm=1-sseg(u,0,.06);
-    lap.style.transform=`rotateX(${((4+mX)*calm).toFixed(3)}deg) rotateY(${(mY*calm).toFixed(3)}deg)`;
+    S(lap,'transform',`rotateX(${((4+mX)*calm).toFixed(2)}deg) rotateY(${(mY*calm).toFixed(2)}deg)`);
     lap.classList.toggle('scrolling',p>0.0005);
-    const oL=1-sseg(u,.185,.225);
-    stage.style.setProperty('--dim',(sseg(u,.045,.11)*(1-.6*sseg(u,.085,.105)*(1-sseg(u,.165,.18)))).toFixed(3));   // podium dims with the room, lifts under the spotlights
-    stage.style.transform=''; stage.style.opacity=oL.toFixed(3); stage.style.visibility=oL>.002?'visible':'hidden';
-    { const ls=document.getElementById('lapSpots'); if(ls){ const on=sseg(u,.085,.105)*(1-sseg(u,.165,.18)); ls.style.opacity=on.toFixed(3); ls.style.visibility=on>.002?'visible':'hidden'; } }
-    window.__scr?.lap(null,0);
+    const oL=1-sseg(u,.172,.198);
+    S(podium,'--dim',(sseg(u,.045,.11)*(1-.6*sseg(u,.085,.105)*(1-sseg(u,.165,.18)))).toFixed(2));   // podium dims with the room, lifts under the spotlights
+    S(stage,'opacity',oL.toFixed(3)); S(stage,'visibility',oL>.002?'visible':'hidden');
+    window.__lapVis?.(oL>.002);
+    if(lapSpots){ const on=sseg(u,.085,.105)*(1-sseg(u,.165,.18)); S(lapSpots,'opacity',on.toFixed(3)); S(lapSpots,'visibility',on>.002?'visible':'hidden'); }
 
-    // iPads
-    const oT=ringO(aT)*sseg(u,.235,.31);
-    sceneTabs.style.visibility=oT>.002?'visible':'hidden';
-    tabBlue.style.transform=''; tabMint.style.transform=''; tabBlue.style.opacity=1; tabMint.style.opacity=1;
-    document.querySelector('#tabBlue .scr').style.opacity=1; window.__scr?.ipad(0);
-    tabsRow.style.transform=ringXf(aT,vw); tabsRow.style.opacity=oT.toFixed(3);
-    const hT=sseg(u,.29,.35)*(1-sseg(u,.49,.53));
-    headTabs.style.opacity=hT.toFixed(3); headTabs.style.transform=`translateY(${((1-hT)*26).toFixed(2)}px)`;
+    // iPads fade up quickly out of the blackout
+    const fadeT=sseg(u,.188,.222);
+    const oT=ringO(aT)*fadeT;
+    S(sceneTabs,'visibility',oT>.002?'visible':'hidden');
+    S(tabsRow,'transform',ringXf(aT,vw)); S(tabsRow,'opacity',oT.toFixed(3));
+    const hT=sseg(u,.235,.285)*(1-sseg(u,.49,.53));
+    S(headTabs,'opacity',hT.toFixed(3)); S(headTabs,'transform',`translateY(${((1-hT)*26).toFixed(1)}px)`);
 
     // grey studio -> black around the iPads, spotlights once they settle
-    const dk=.8*sseg(u,.045,.11)+.2*sseg(u,.165,.2), sp=sseg(u,.30,.37)*(1-sseg(u,.49,.54));   // stays black through the iPad Pro
-    document.getElementById('bgDark').style.opacity=dk.toFixed(3);
-    sceneTabs.style.setProperty('--dk',dk.toFixed(3)); sceneTabs.style.setProperty('--spot',sp.toFixed(3)); scenePro.style.setProperty('--dk',dk.toFixed(3));
+    const dk=.8*sseg(u,.045,.11)+.2*sseg(u,.165,.2), sp=sseg(u,.23,.28)*(1-sseg(u,.49,.54));
+    S(bgDark,'opacity',dk.toFixed(3));
+    S(headTabs,'--dk',dk.toFixed(2)); spotEls.forEach(e=>S(e,'opacity',sp.toFixed(3))); proHead.forEach(h=>S(h,'--dk',dk.toFixed(2)));   // set on the lights themselves, not the whole iPad scene (that restyled every app inside the iPads each frame)
 
     // iPad Pro
     const oP=ringO(aP);
-    scenePro.style.visibility=oP>.002?'visible':'hidden';
-    proImg.style.transform=ringXf(aP,vw); proImg.style.opacity=oP.toFixed(3);
-    proImg.style.setProperty('--gs',sseg(u,.64,.80).toFixed(3));   // goop grows as the iPad Pro settles
+    S(scenePro,'visibility',oP>.002?'visible':'hidden');
+    S(proImg,'transform',ringXf(aP,vw)); S(proImg,'opacity',oP.toFixed(3));
+    const gs=sseg(u,.64,.80).toFixed(3); goops.forEach(g=>S(g,'--gs',gs));   // goop grows as the iPad Pro settles
     window.__scr?.pro(0,oP);
+    if(window.__scr){ if(!render._scr){ render._scr=1; window.__scr.lap(null,0); window.__scr.ipad(0); } window.__scr.phones(1,p); }
     if(!render._land){ render._land=1; // stand the landscape iPad on the desk too (its rotated image floats mid-box)
       const fix=()=>{ tabBlue.style.translate=''; const im=tabBlue.querySelector('.dev-img'); if(!im) return;
-        const d=tabsRow.getBoundingClientRect().bottom-im.getBoundingClientRect().bottom; if(d>0) tabBlue.style.translate=`0 ${d.toFixed(1)}px`; kick(); };
+        const d=tabsRow.getBoundingClientRect().bottom-im.getBoundingClientRect().bottom; if(d>0) tabBlue.style.translate=`0 ${d.toFixed(1)}px`; geo=null; kick(); };
       addEventListener('resize',fix); tabBlue.querySelector('.dev-img')?.addEventListener('load',fix); setTimeout(fix,0); setTimeout(fix,600); }
-    { // desk: top edge sits just under whichever device is centred, so they stand on it
-      const desk=document.getElementById('desk'), st=document.getElementById('sticky').getBoundingClientRect();
-      const tb=tabsRow.getBoundingClientRect().bottom-st.top, pb=proImg.getBoundingClientRect().bottom-st.top;
-      const vh=sticky.clientHeight, y=lerp(tb-vh*.035, pb-vh*.075, glide(u,.52,.74));
-      proImg.style.setProperty('--powCut',(vh*.075+1).toFixed(1)+'px');   // POW ends at the desk's back edge
-      desk.style.top=Math.round(y)+'px';
-      desk.style.opacity=sseg(u,.235,.31).toFixed(3);   // fades up with the iPads out of the blackout
-      desk.style.transform='';
-      desk.style.filter=`brightness(${(1-dk*.5).toFixed(3)})`;
+    { // desk: top edge sits just under whichever device is centred, so they stand on it (anchors measured once, not per frame)
+      const y=lerp(geo.tb-vh*.035, geo.pb-vh*.075, glide(u,.52,.74));
+      powClips.forEach(c=>S(c,'--powCut',(vh*.075+1).toFixed(0)+'px'));   // POW ends at the desk's back edge
+      S(desk,'top',Math.round(y)+'px');
+      S(desk,'opacity',fadeT.toFixed(3));
+      S(desk,'--shade',(dk*.5).toFixed(2));   // dimmed with a black overlay (cheap) instead of a filter (repainted the wood every frame)
     }
-    const hP=sseg(u,.70,.76);
-    window.__curtain?.setHead(hP);
-
-    // retired pieces of the old dive story stay out of the way
-    take.style.visibility='hidden'; devices.style.visibility='hidden'; car.style.transform='';
-    window.__scr?.phones(1,p); st.center=0;
-    rhead.style.opacity=0; ctrl.style.opacity=0; ctrl.style.pointerEvents='none';
+    window.__curtain?.setHead(sseg(u,.70,.76));
     { const c=sseg(u,.76,.86);   // scrolling only frames the stage; the curtains then shut on their own after a pause
       window.__curtain?.setFrame(c, c>=.999 && u>=.86); }
     window.__stations?.(u);
   }
 
   addEventListener('scroll',kick,{passive:true});
-  addEventListener('resize',()=>{ base=null; geo=null; kick(); });
-  window.__storyRefresh=()=>{ base=null; geo=null; readTarget(); prog=target; render(prog); };
-  document.fonts?.ready.then(()=>{ base=null; kick(); });
+  let rzT=0; const remeasure=()=>{ base=null; geo=null; sTotal=0; kick(); };
+  addEventListener('resize',()=>{ clearTimeout(rzT); rzT=setTimeout(remeasure,60); });
+  addEventListener('load',remeasure); addEventListener('hashchange',()=>setTimeout(remeasure,50));
+  window.__storyRefresh=()=>{ base=null; geo=null; sTotal=0; readTarget(); prog=target; render(prog); };
+  document.fonts?.ready.then(remeasure);
   readTarget(); prog=target; render(prog);
 
   // ---- load intro: text rises in word by word, then the laptop comes forward and opens ----
@@ -3786,10 +3812,10 @@ html.door-lock, html.door-lock body{ overflow:hidden !important; overscroll-beha
   const E_OUT='cubic-bezier(.16,1,.3,1)';
   document.querySelector('.hero-kicker').animate([{opacity:0,transform:'translateY(10px)'},{opacity:1,transform:'none'}],{duration:700,delay:100,easing:E_OUT,fill:'backwards'});
   document.querySelector('.bigword')?.animate([   // movie-title slam: swoops in big from the distance, overshoots, settles
-    {opacity:0,transform:'perspective(900px) translateZ(-600px) rotateX(18deg) scale(.4)',filter:'blur(10px)'},
-    {opacity:1,offset:.55,transform:'perspective(900px) translateZ(60px) rotateX(-4deg) scale(1.08)',filter:'blur(0) drop-shadow(0 30px 40px rgba(30,34,44,.35))'},
-    {opacity:1,offset:.8,transform:'perspective(900px) translateZ(0) rotateX(1deg) scale(.98)',filter:'drop-shadow(0 18px 30px rgba(30,34,44,.28))'},
-    {opacity:1,transform:'none',filter:'drop-shadow(0 18px 30px rgba(30,34,44,.28))'}],{duration:1600,delay:250,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});
+    {opacity:0,transform:'perspective(900px) translateZ(-600px) rotateX(18deg) scale(.4)'},
+    {opacity:1,offset:.55,transform:'perspective(900px) translateZ(60px) rotateX(-4deg) scale(1.08)'},
+    {opacity:1,offset:.8,transform:'perspective(900px) translateZ(0) rotateX(1deg) scale(.98)'},
+    {opacity:1,transform:'none'}],{duration:1600,delay:250,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});
   document.querySelectorAll('.studio .side').forEach((el,i)=>el.animate([{opacity:0,transform:`translateX(${i?20:-20}px)`},{opacity:1,transform:'none'}],{duration:900,delay:900,easing:E_OUT,fill:'backwards'}));
   [...document.querySelectorAll('.hl .wd')].forEach((w,i)=>w.animate(
     [{opacity:0,transform:'translateY(.4em)',filter:'blur(6px)'},{opacity:1,transform:'none',filter:'blur(0)'}],
@@ -4471,7 +4497,6 @@ Apps.def('morrow',(root,api)=>{
   function step(a){ const t=TOURS[a.root.dataset.app]; if(!t) return; const s=t[a.tourI++%t.length]; typeof s==='string'?a.go(s):s(a); }
   if(!reduce) setInterval(()=>{
     if(document.hidden||home.hidden) return;
-    if(p<.1 && idle(lune) && Date.now()-lastScroll>800) lune.cycle();
     if(p>.53 && p<.62 && idle(keel) && Date.now()-lastScroll>1500) step(keel);
     if(p>=.92 && Date.now()-lastScroll>1500){ const a=document.querySelector('.slot.is-active .app')?.__app; if(a && idle(a)) step(a); }
   },3400);
@@ -4500,8 +4525,10 @@ Apps.def('morrow',(root,api)=>{
     return {m,play};
   });
   const show=n=>{ mixes.forEach((m,i)=>m.classList.toggle('on',i===n)); vids.forEach((v,i)=>{ if(!v) return; if(i===n){ v.currentTime=0; v.play?.().catch(()=>{}); } else setTimeout(()=>v.pause(),950); }); lives.forEach(l=>{ if(l.m===mixes[n]) l.play(); }); };
+  let vis=true;
+  window.__lapVis=v=>{ if(v===vis) return; vis=v; const cur=vids[k]; if(cur){ if(v) cur.play?.().catch(()=>{}); else cur.pause(); } };
   vids[0]?.play?.().catch(()=>{});
-  if(!reduce) setInterval(()=>{ if(document.hidden) return; k=(k+1)%mixes.length; show(k); },9000);
+  if(!reduce) setInterval(()=>{ if(document.hidden||!vis||document.getElementById('view-home').hidden) return; k=(k+1)%mixes.length; show(k); },9000);
 })();
 </script>
 
@@ -4542,7 +4569,7 @@ Apps.def('morrow',(root,api)=>{
   const wipe=document.getElementById('wipe');
   let current='home', busy=false;
   function show(name){
-    Object.entries(views).forEach(([k,v])=>v.hidden=k!==name);
+    Object.entries(views).forEach(([k,v])=>v.hidden=k!==name); document.documentElement.dataset.view=name;
     current=name; scrollTo(0,0);
     if(name==='home') window.__storyRefresh&&window.__storyRefresh();
     else if(name==='process'){ prog=target=0; frame(); window.__workTick&&window.__workTick(); const sg=document.querySelector('.w-sig'); if(sg){ sg.style.animation='none'; sg.offsetWidth; sg.style.animation=''; } }
@@ -4809,16 +4836,15 @@ Apps.def('morrow',(root,api)=>{
   const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)), sm=t=>t*t*(3-2*t);
   let tk=false;
   function tick(){
-    tk=false; if(grid.offsetParent===null) return;
+    tk=false; if(document.documentElement.dataset.view!=='process') return;   // no layout read while another page is showing (it stalled every home-page scroll frame)
     if(reduce){ const wk=document.getElementById('work').getBoundingClientRect(); document.querySelector('.p-nav').classList.toggle('light', wk.bottom>64 || document.getElementById('contact').getBoundingClientRect().top<64); return; }
     const vh=innerHeight;
-    cards.forEach((c,i)=>{ if(c.classList.contains('hide')) return; const r=c.getBoundingClientRect();
-      const t=sm(clamp((vh*1.05-r.top)/(vh*.4)));
-      c.style.opacity=(.15+.85*t).toFixed(3); c.style.translate=`0 ${((1-t)*50).toFixed(1)}px`; });
-    const wk=document.getElementById('work').getBoundingClientRect();
-    document.querySelector('.p-nav').classList.toggle('light', wk.bottom>64 || document.getElementById('contact').getBoundingClientRect().top<64);
-    const h=document.querySelector('.w-head'), r=h.getBoundingClientRect(), t=sm(clamp((vh*.95-r.top)/(vh*.45)));
-    h.style.opacity=''; h.style.translate='';   // heading stays at full strength so its gradient matches the others
+    const vis=cards.filter(c=>!c.classList.contains('hide'));
+    const tops=vis.map(c=>c.getBoundingClientRect().top - (parseFloat(c.style.translate?.split(' ')[1])||0));
+    const wk=document.getElementById('work').getBoundingClientRect(), ct=document.getElementById('contact').getBoundingClientRect().top;
+    vis.forEach((c,i)=>{ const t=sm(clamp((vh*1.05-tops[i])/(vh*.4))); const o=(.15+.85*t).toFixed(2), tr=`0 ${((1-t)*50).toFixed(0)}px`;
+      if(c.__o!==o){ c.__o=o; c.style.opacity=o; } if(c.__t!==tr){ c.__t=tr; c.style.translate=tr; } });
+    document.querySelector('.p-nav').classList.toggle('light', wk.bottom>64 || ct<64);
   }
   addEventListener('scroll',()=>{ if(!tk){ tk=true; requestAnimationFrame(tick); } },{passive:true});
   addEventListener('resize',tick); tick(); window.__workTick=tick;
@@ -5344,7 +5370,7 @@ document.querySelectorAll('.studio .laurel').forEach(svg=>{
   #view-process::after{ content:""; position:fixed; inset:0; z-index:40; pointer-events:none; opacity:.5;
     background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0,rgba(0,0,0,0) 2px,rgba(0,12,40,.22) 3px); mix-blend-mode:multiply; }
   #view-process[hidden]::before, #view-process[hidden]::after{ display:none; }
-  #hkRain{ position:fixed; inset:0; width:100%; height:100%; z-index:-1; pointer-events:none; opacity:.34; }
+  #hkRain{ position:fixed; left:0; top:0; width:100%; height:100vh; height:100lvh; z-index:-1; pointer-events:none; opacity:.34; }
   #view-process .sx-label{ color:var(--mut); text-transform:lowercase; letter-spacing:.02em; border-bottom:1px dashed var(--line); }
   #view-process .sx-label b{ color:var(--hk); text-shadow:0 0 12px rgba(90,209,255,.7); }
   #view-process .sx-label::before{ content:"root@lorielle:~$"; color:#3fe0a6; text-shadow:0 0 10px rgba(63,224,166,.5); }
@@ -5638,7 +5664,7 @@ document.querySelectorAll('.studio .laurel').forEach(svg=>{
   @media (max-width:720px){ #curtains .and-scene{ width:88vw; } #curtains .presented{ width:84vw; top:calc(47% + 88vw * .23 + 14px); } }
   @media (prefers-reduced-motion:reduce){ #curtains .and-scene{ scale:1; } }
   /* ---- hero scroll: easy navigation ---- */
-  html.home-snap{ scroll-snap-type:y proximity; }
+  html.home-snap{ scroll-snap-type:none; }
   .story .snap{ position:absolute; left:0; width:1px; height:1px; top:calc(var(--u) * (600vh - 100svh)); scroll-snap-align:start; pointer-events:none; }
   button.hint{ background:none; border:0; padding:6px 10px; font:inherit; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#8a8e95; cursor:pointer; }
   button.hint:hover{ color:#1d1d1f; } button.hint:focus-visible{ outline:2px solid #4f93ff; outline-offset:4px; border-radius:6px; }
@@ -5719,7 +5745,47 @@ document.querySelectorAll('.studio .laurel').forEach(svg=>{
   #view-process .w-card:hover .w-media{ filter:brightness(1.06); }
   @media (max-width:1000px){ #view-process .w-grid, #view-process .w-grid.filtered{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; } #view-process .w-media, #view-process .w-card:hover .w-media{ height:clamp(200px,34vw,300px) !important; } }
   @media (max-width:640px){ #view-process .w-grid, #view-process .w-grid.filtered{ grid-template-columns:1fr !important; } #view-process .w-media, #view-process .w-card:hover .w-media{ height:clamp(220px,62vw,320px) !important; } }
+  /* tablets held upright: size the iPads by width so both fit side by side, and give the laptop more of the tall screen */
+  @media (min-width:721px) and (max-aspect-ratio:1/1){
+    #view-home .sticky{ --lw:min(76vw,52vh) !important; }
+    .tab-blue{ height:min(56vh,46vw) !important; } .tab-mint{ height:min(54vh,44vw) !important; }
+    .tab-blue.land{ margin:0 calc(min(56vh,46vw) * .15) !important; }
+  }
+  /* buttons that float over moving scenes: solid fills instead of live background blur (re-blurring every frame made phones and iPads stutter) */
+  .st-skip{ -webkit-backdrop-filter:none !important; backdrop-filter:none !important; background:rgba(17,18,20,.74); }
+  #view-process .back, #view-process .p-start{ -webkit-backdrop-filter:none !important; backdrop-filter:none !important; background:rgba(3,14,38,.95) !important; }
 
+</style>
+<style id="smoothPass">
+  /* ===== smoothness pass: fewer repaints, steadier layout on iPad / iPhone ===== */
+  .sticky{ height:100vh; height:100lvh; }                       /* fixed size: never jumps when Safari's toolbar shows or hides */
+  html[data-view="home"], html[data-view="home"] body{ background:#0b0b0d; }
+  html[data-view="process"], html[data-view="process"] body{ background:#02081a; }
+  #screen .app.lu > :not(.lap-rec):not(.veil){ display:none !important; }   /* demo app hidden under the laptop recordings kept repainting */
+  .bigword.title-logo{ filter:none !important; }                /* shadow is baked into the image */
+  .bigword.title-logo img{ width:118.364%; max-width:none; margin:-9.182% 0 -9.182% -9.182%; will-change:transform; }
+  #intro, .hint, #bgDark, #lapSpots, #headTabs, #headPro, .dev .spot, .dev .pool{ will-change:opacity, transform; }
+  #lapSpots{ mix-blend-mode:normal !important; }
+  #view-process::after{ mix-blend-mode:normal !important; opacity:.3 !important; }
+  #view-home .podium{ filter:none !important; }
+  #view-home .podium i::after{ content:""; position:absolute; inset:-3px; border-radius:inherit; background:#000; pointer-events:none;
+    opacity:calc(var(--dim,0) * .55); will-change:opacity; }
+  #desk::after{ content:""; position:absolute; inset:0; background:#000; opacity:var(--shade,0); pointer-events:none; will-change:opacity; }
+  .pow-star, .pow-cloud{ animation:none !important; }
+  #view-home .goop{ will-change:transform, scale, rotate, opacity; }
+  #view-home .goop svg{ animation:powSway 3.6s ease-in-out infinite alternate; will-change:transform; transform-origin:50% 55%; }
+  @keyframes powSway{ from{ transform:rotate(-1.4deg) scale(1) } to{ transform:rotate(1.4deg) scale(1.025) } }
+  #curtains .cur-l, #curtains .cur-r{ will-change:transform; }
+  /* See more page: a solid strip behind the Home / Start a project buttons so text never shows around them */
+  #view-process .p-nav::before{ content:""; position:absolute; z-index:-1; left:0; right:0; top:calc(-1 * env(safe-area-inset-top,0px)); bottom:-26px; pointer-events:none;
+    background:linear-gradient(180deg, rgba(2,8,26,.97) 0%, rgba(2,8,26,.93) 60%, rgba(2,8,26,0) 100%); }
+  @media (max-width:720px){ .bigword.title-logo{ top:calc(24vh + 52px) !important; } }
+  @media (max-width:720px) and (max-height:720px){ .studio .hero-kicker{ top:17vh !important; } .bigword.title-logo{ top:calc(17vh + 48px) !important; width:80vw !important; } }
+  @media (prefers-reduced-motion:reduce){ #view-home .goop svg{ animation:none; } }
+  /* phones: the contact column was as wide as the email address, which let the whole page slide sideways */
+  @media (max-width:860px){ .ct-grid{ grid-template-columns:minmax(0,1fr) !important; } .ct-list > div{ grid-template-columns:96px minmax(0,1fr) !important; } }
+  #cEmail{ overflow-wrap:anywhere; min-width:0; }
+  .ct-info, .ct-list, .ct-list dd, .c-form{ min-width:0; }
 </style>
 
 <div class="bar" id="bar" role="toolbar" aria-label="Annotation tools">
@@ -5990,19 +6056,20 @@ document.querySelectorAll('.studio .laurel').forEach(svg=>{
   const c=document.getElementById('hkRain'), v=document.getElementById('view-process'); if(!c||!v) return;
   if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const g=c.getContext('2d'); const CH='01{}[]<>/=+*#$%&ABCDEFabcdef;:'; let cols=[], fs=16, run=false, last=0;
-  function size(){ const dpr=Math.min(devicePixelRatio||1,1.5); c.width=innerWidth*dpr; c.height=innerHeight*dpr; g.setTransform(dpr,0,0,dpr,0,0); fs=innerWidth<700?14:16; cols=Array.from({length:Math.ceil(innerWidth/fs)},()=>Math.random()*innerHeight/fs); }
+  let sw=0; const H=()=>Math.max(innerHeight, document.documentElement.clientHeight, Math.min(screen.width,screen.height)>0?Math.max(screen.width,screen.height):0);
+  function size(){ if(innerWidth===sw && cols.length) return; sw=innerWidth; const dpr=Math.min(devicePixelRatio||1,1.25), h=H(); c.width=innerWidth*dpr; c.height=h*dpr; g.setTransform(dpr,0,0,dpr,0,0); fs=innerWidth<700?14:16; cols=Array.from({length:Math.ceil(innerWidth/fs)},()=>Math.random()*h/fs); g.fillStyle='#02081a'; g.fillRect(0,0,innerWidth,h); }
   function tick(t){
     if(v.hidden){ run=false; return; }
     requestAnimationFrame(tick); if(t-last<55) return; last=t;
-    g.fillStyle='rgba(2,8,26,.14)'; g.fillRect(0,0,innerWidth,innerHeight);
+    const hh=c.height/(Math.min(devicePixelRatio||1,1.25)); g.fillStyle='rgba(2,8,26,.14)'; g.fillRect(0,0,innerWidth,hh);
     g.font=fs+'px "JetBrains Mono",monospace';
     for(let i=0;i<cols.length;i++){
       const x=i*fs, y=cols[i]*fs; g.fillStyle=Math.random()<.04?'#bfe9ff':'#2f78ff';
       g.fillText(CH[Math.random()*CH.length|0],x,y);
-      if(y>innerHeight && Math.random()>.975) cols[i]=0; else cols[i]+=1;
+      if(y>hh && Math.random()>.975) cols[i]=0; else cols[i]+=1;
     }
   }
-  function start(){ if(run||v.hidden) return; run=true; size(); g.fillStyle='#02081a'; g.fillRect(0,0,innerWidth,innerHeight); requestAnimationFrame(tick); }
+  function start(){ if(run||v.hidden) return; run=true; size(); requestAnimationFrame(tick); }
   new MutationObserver(start).observe(v,{attributes:true,attributeFilter:['hidden']});
   addEventListener('resize',()=>{ if(run) size(); }); start();
 })();
@@ -6063,14 +6130,15 @@ document.querySelectorAll('.studio .laurel').forEach(svg=>{
   let c=0, head=0, armed=false, t0=0, k=0, a=0, raf=0, last=0;
   const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
   let kLin=0, aLin=0;
+  const PC=new Map(); const W=(el,key,v)=>{ if(!el) return; const id=key; let m=PC.get(el); if(!m){ m={}; PC.set(el,m); } if(m[id]===v) return; m[id]=v; if(key[0]==='-') el.style.setProperty(key,v); else el.style[key]=v; };
   function paint(){
     k=ease(kLin); a=ease(aLin);
-    cu.style.setProperty('--c',c.toFixed(3)); cu.style.setProperty('--k',k.toFixed(4)); cu.style.setProperty('--a',a.toFixed(3));
-    cu.style.visibility=c>.001?'visible':'hidden';
+    W(cu,'--c',c.toFixed(3)); W(cu,'--k',k.toFixed(4)); W(cu,'--a',a.toFixed(3));
+    W(cu,'visibility',c>.001?'visible':'hidden');
     const h=head*(1-Math.min(1,k*1.6));
-    if(hp){ hp.style.opacity=h.toFixed(3); hp.style.transform=`translateY(${((1-h)*26).toFixed(2)}px)`; }
-    if(ce){ ce.style.opacity=a.toFixed(3); ce.style.pointerEvents=a>.9?'auto':'none'; ce.tabIndex=a>.5?0:-1; }
-    window.__skipFade?.(Math.max(a,k));
+    if(hp){ W(hp,'opacity',h.toFixed(3)); W(hp,'transform',`translateY(${((1-h)*26).toFixed(1)}px)`); }
+    if(ce){ W(ce,'opacity',a.toFixed(3)); W(ce,'pointerEvents',a>.9?'auto':'none'); const ti=a>.5?0:-1; if(ce.tabIndex!==ti) ce.tabIndex=ti; }
+    const sk=Math.max(a,k).toFixed(3); if(sk!==paint._sk){ paint._sk=sk; window.__skipFade?.(+sk); }
   }
   function loop(now){
     raf=0; const dt=Math.min(64,now-(last||now)); last=now;
@@ -6103,13 +6171,13 @@ document.querySelectorAll('.studio .laurel').forEach(svg=>{
   btns.forEach((b,i)=>b.addEventListener('click',()=>go(STOPS[i])));
   hint.addEventListener('click',()=>go(STOPS[1]));
   window.__stations=u=>{
-    const i=u<.2?0:u<.62?1:2; if(i!==cur){ cur=i; }
+    const i=u<.2?0:u<.62?1:2; if(i===cur) return; cur=i;
     btns.forEach((b,k)=>{ b.classList.toggle('on',k===i); b.setAttribute('aria-current',k===i?'step':'false'); });
   };
-  window.__stations(0);
+  cur=-1; window.__stations(0);
   window.__skipFade=a=>{ skip.style.opacity=(1-a).toFixed(3); skip.style.pointerEvents=a>.5?'none':'auto'; skip.tabIndex=a>.5?-1:0; };
   // snapping only while the home story is on screen
-  const sync=()=>document.documentElement.classList.toggle('home-snap',!document.getElementById('view-home').hidden && !reduce);
+  const sync=()=>document.documentElement.classList.remove('home-snap');   // snapping retired: it fought touch scrolling
   sync(); addEventListener('hashchange',()=>setTimeout(sync,0));
   new MutationObserver(sync).observe(document.getElementById('view-home'),{attributes:true,attributeFilter:['hidden']});
 })();
