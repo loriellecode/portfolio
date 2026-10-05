@@ -4682,7 +4682,9 @@ Apps.def('morrow',(root,api)=>{
     const E='cubic-bezier(.76,0,.24,1)';
     const enter=()=>{
       const inEls=name==='project'?[document.querySelector('#view-project .pj-head')]:name==='process'?[document.querySelector('.w-head')]:[document.getElementById('intro'),document.getElementById('stage')];
-      inEls.forEach(el=>el&&el.animate([{opacity:0,translate:'0 30px'},{opacity:1,translate:'0 0'}],{duration:1000,delay:up?550:250,easing:'cubic-bezier(.16,1,.3,1)',fill:'backwards'}));
+      inEls.forEach(el=>{ if(!el) return;   // rise in from 30px lower, keeping each element's own centring offset (the laptop stage is centred with translate:-50%)
+        const t=getComputedStyle(el).translate, [x='0px',y='0px']=(t&&t!=='none')?t.split(' '):[];
+        el.animate([{opacity:0,translate:`${x} calc(${y} + 30px)`},{opacity:1,translate:`${x} ${y}`}],{duration:1000,delay:up?550:250,easing:'cubic-bezier(.16,1,.3,1)',fill:'backwards'}); });
     };
     // forward: code floats down and up into place; back home: the same code, but everything rises
     codeTransition(()=>{ show(name); enter(); },()=>{ busy=false; }, up?0:-1);
@@ -5764,13 +5766,13 @@ document.querySelectorAll('.studio .laurel').forEach(svg=>{
   #screen .app.lu > :not(.lap-rec):not(.veil){ display:none !important; }   /* demo app hidden under the laptop recordings kept repainting */
   .bigword.title-logo{ filter:none !important; }                /* shadow is baked into the image */
   .bigword.title-logo img{ width:118.364%; max-width:none; margin:-9.182% 0 -9.182% -9.182%; will-change:transform; }
-  #intro, .hint, #bgDark, #lapSpots, #headTabs, #headPro, .dev .spot, .dev .pool{ will-change:opacity, transform; }
+  #intro, .hint, #bgDark, #lapSpots, #headPro{ will-change:opacity, transform; }   /* nothing promoted inside or beside the iPads: Safari stopped drawing their masked screens */
   #lapSpots{ mix-blend-mode:normal !important; }
   #view-process::after{ mix-blend-mode:normal !important; opacity:.3 !important; }
   #view-home .podium{ filter:none !important; }
   #view-home .podium i::after{ content:""; position:absolute; inset:-3px; border-radius:inherit; background:#000; pointer-events:none;
     opacity:calc(var(--dim,0) * .55); will-change:opacity; }
-  #desk::after{ content:""; position:absolute; inset:0; background:#000; opacity:var(--shade,0); pointer-events:none; will-change:opacity; }
+  #desk::after{ content:""; position:absolute; inset:0; background:#000; opacity:var(--shade,0); pointer-events:none; }
   .pow-star, .pow-cloud{ animation:none !important; }
   #view-home .goop{ will-change:transform, scale, rotate, opacity; }
   #view-home .goop svg{ animation:powSway 3.6s ease-in-out infinite alternate; will-change:transform; transform-origin:50% 55%; }
