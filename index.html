@@ -5785,6 +5785,11 @@ document.querySelectorAll('.studio .laurel').forEach(svg=>{
   /* phones: the contact column was as wide as the email address, which let the whole page slide sideways */
   @media (max-width:860px){ .ct-grid{ grid-template-columns:minmax(0,1fr) !important; } .ct-list > div{ grid-template-columns:96px minmax(0,1fr) !important; } }
   #cEmail{ overflow-wrap:anywhere; min-width:0; }
+  /* desktop & iPad landscape: a smaller title, a little higher, so the laptop has room to breathe */
+  @media (min-width:721px) and (orientation:landscape){
+    .studio .hero-kicker{ top:calc(clamp(56px,10vh,120px) - 26px) !important; }
+    .bigword.title-logo{ top:calc(clamp(56px,10vh,120px) + clamp(14px,2vw,28px)) !important; width:min(34vw,50vh,560px) !important; }
+  }
   .ct-info, .ct-list, .ct-list dd, .c-form{ min-width:0; }
 </style>
 
