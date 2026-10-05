@@ -3802,14 +3802,23 @@ html.door-lock, html.door-lock body{ overflow:hidden !important; overscroll-beha
     const pod=document.querySelector('#view-home .podium'), lift=pod?.querySelector('.pd-lift');
     const Y=Math.round(lap.offsetHeight*1.06), K=Math.max(4,Math.round(Y*.025));
     const RISE={duration:1900,delay:lapIn,easing:'cubic-bezier(.45,.05,.25,1)',fill:'backwards'};
+    // everything below the shaft's FRONT rim is hidden, so the laptop sinks into the opening instead of being sliced by a flat line
+    const topEl=pod?.querySelector('.pd-top'), tr=topEl?.getBoundingClientRect();
+    const mk=el=>{ const r=el.getBoundingClientRect(); return {el,x:tr.left+tr.width/2-r.left, y:tr.top+tr.height/2-r.top, L:Math.max(r.width,r.height)*3}; };
+    const rx=Math.max(4,tr.width/2-12), ry=Math.max(2,tr.height/2-12);
+    const clipFor=(c,ty)=>{ const cy=c.y-ty, L=c.L;
+      return `path('M ${-L} ${-L} H ${L} V ${cy} H ${c.x+rx} A ${rx} ${ry} 0 0 1 ${c.x-rx} ${cy} H ${-L} Z')`; };
+    const subj=[mk(lap)].concat(lift?[mk(lift)]:[]);
     pod?.classList.add('rising');
-    lap.animate([{translate:`0 ${Y}px`,clipPath:`inset(-80% -40% ${Y}px -40%)`},
-                 {translate:`0 ${-K}px`,clipPath:`inset(-80% -40% ${-K}px -40%)`,offset:.84},
-                 {translate:'0 0',clipPath:'inset(-80% -40% 0px -40%)'}],RISE);
-    const la=lift?.animate([{transform:`translateY(${Y}px)`,clipPath:`ellipse(50% 50% at 50% calc(50% - ${Y}px))`},
-                 {transform:`translateY(${-K}px)`,clipPath:`ellipse(50% 50% at 50% calc(50% + ${K}px))`,offset:.84},
-                 {transform:'translateY(0)',clipPath:'ellipse(50% 50% at 50% 50%)'}],RISE);
-    const end=()=>pod?.classList.remove('rising'); la?la.finished.then(end,end):end();
+    lap.animate([{translate:`0 ${Y}px`},{translate:`0 ${-K}px`,offset:.84},{translate:'0 0'}],RISE);
+    const la=lift?.animate([{transform:`translateY(${Y}px)`},{transform:`translateY(${-K}px)`,offset:.84},{transform:'translateY(0)'}],RISE);
+    const ty=el=>{ const m=getComputedStyle(el); const v=(el===lap?m.translate:m.transform); if(!v||v==='none') return 0;
+      if(el===lap){ const q=v.split(' '); return parseFloat(q[1])||0; } const mm=new DOMMatrix(v); return mm.m42; };
+    let raf; const t0=performance.now(), tot=RISE.delay+RISE.duration+60;
+    const tick=()=>{ subj.forEach(c=>{ c.el.style.clipPath=clipFor(c,ty(c.el)); });
+      if(performance.now()-t0<tot) raf=requestAnimationFrame(tick); else subj.forEach(c=>c.el.style.clipPath=''); };
+    tick();
+    const end=()=>{ pod?.classList.remove('rising'); cancelAnimationFrame(raf); subj.forEach(c=>c.el.style.clipPath=''); }; la?la.finished.then(end,end):end();
   }
   // lid stays open so the screen is visible as it rises
   setTimeout(()=>{ lap.style.transformStyle=''; base=null; kick(); },lapIn+1700);
